@@ -19,7 +19,7 @@ if(!file.exists("download_folder")) {
 }
 setwd("download_folder/")
 
-###Download latest CPI excel from INDEC website -----
+###Find the URL -----
 
 #We automate the URL for downloading the latest inflation figures: for figures of a given month (say, January), the URL is 
 #named after the following month (here, February).
