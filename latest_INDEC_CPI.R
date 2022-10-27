@@ -1,4 +1,6 @@
 
+###This code downloads Argentina's latest CPI index, and outputs excel files for each 
+    #component of the CPI basket, with data by region. The base period is December 2016. 
 rm(list=ls())
 gc()
 
@@ -8,7 +10,6 @@ library(readxl)
 library(openxlsx)
 library(readr)
 library(janitor)
-
 ##Generate temporary download folder----
 
 setwd("C:/Users/lcalcagno/Documents/Investigación/argentina_fiscal_pension_data")
