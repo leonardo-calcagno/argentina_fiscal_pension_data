@@ -164,10 +164,16 @@ head(time.taken) #10 minutes to load the dataframes in a 8GB RAM laptop
 ###Detect AIF columns, even when in disorder------
 test<-df_list_s2_xls$`2021_junio.xlsx` 
 test3<-df_list_xls$`1997_05.xls`
-
+nrow(test)
 get_col_names<-function(indata){
-  
-last_column<-length(indata)
+#Fourth quarter of 2015 dataframe have too many rows, which causes bugs: we take only the first 
+      #160 rows 
+if(nrow(indata)>160){
+indata<-indata[1:160,]  
+}else{
+  indata<-indata
+}
+  last_column<-length(indata)
 #The last column is always the total for the whole national administration; 
     #The first column is always useless, and the second has the row name 
 row_name<-indata %>% 
@@ -215,13 +221,36 @@ for(i in 1:7) {
 names(indata)<-names(detect_names)
 outdata<-as.data.frame(c(row_name,indata,total_APN))
 }
+#We now apply this function to all the data frames
+options(error = NULL)
 
-test2<-get_col_names(test)
-test4<-get_col_names(test3)
-test5<-rbind(test2,test4) #This shows we can now rbind the two datasets, even with wrong 
-    #column numbers, and still get the variables right
+view(df_list_xls)
+view(test2)
 
-head(test3)
+
+indata<-indata[1:160,]
+test5<-test[1:160,]
+test6<-test[1:160,]
+test<-df_list_xls$`1999_03.xls`
+test2<-df_list_xls$`2015_11.xls`
+test3<-df_list_xls$`2008_03.xls`
+
+test6<-get_col_names(test2)
+test4<-get_col_names(test5)
+
+n.cols_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [2])) #[1] for rows, [2] for columns
+n.rows_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [1])) #[1] for rows, [2] for columns
+view(n.rows_xls)
+
+test<-sapply(df_list_xls,get_col_names,simplify=FALSE)
+test2<-sapply(df_list_s2_xls,get_col_names,simplify=FALSE)
+test3<-sapply(df_list_s3_xls,get_col_names,simplify=FALSE)
+
+
+df_list_s2_xls<-sapply(df_list_s2_xls,get_col_names,simplify=FALSE)
+df_list_s3_xls<-sapply(df_list_s3_xls,get_col_names,simplify=FALSE)
+
+#It is now safe to use bind_rows on all lists of data frames
 df_AIF <- bind_rows(c(df_list_xls), .id = "file")
 df_AIF_s2<-bind_rows (c(df_list_s2_xls), .id="file")
 df_AIF_s3<-bind_rows (c(df_list_s3_xls), .id="file")
