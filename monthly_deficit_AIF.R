@@ -154,145 +154,74 @@ df_list_s2_xls<- df_list_s2_xls[- which(names(df_list_s2_xls) %in% names_first_s
 df_list_s2_xls<-within(df_list_s2_xls, rm("2018_05.xls"))
 
 df_list_s3_xls<- df_list_s3_xls[- which(names(df_list_s3_xls) %in% names_first_sheet) ]
+
+
+
+end.time=Sys.time()
+time.taken=end.time-start.time
+head(time.taken) #10 minutes to load the dataframes in a 8GB RAM laptop
+
+###Detect AIF columns, even when in disorder------
 test<-df_list_s2_xls$`2021_junio.xlsx` 
-last_column<-length(test)
+test3<-df_list_xls$`1997_05.xls`
 
-test<-test %>% 
-  select(-c(1,2,last_column)) #The last column is always the total for the whole national administration, so we delete it
-list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","OTROS","EMPRESAS")
-
-detect_names<-test[(!grepl("[0-9]", test$...3)) & !is.na(test$...3), ]
-temporary_names<-c("var1","var2","var3","var4","var5","var6","var7")
-names(detect_names)<-temporary_names
-
-check_pattern<-function(indata,pattern){
+get_col_names<-function(indata){
   
-  
-  
-  is_name_in_pattern<-indata %>% 
-    mutate(test_var1=ifelse(grepl(pattern,var1,ignore.case=TRUE), 1, 
-                            0),
-           test_var2=ifelse(grepl(pattern,var2,ignore.case=TRUE), 1, 
-                            0),
-           test_var3=ifelse(grepl(pattern,var3,ignore.case=TRUE), 1, 
-                            0),
-           test_var4=ifelse(grepl(pattern,var4,ignore.case=TRUE), 1, 
-                            0),
-           test_var5=ifelse(grepl(pattern,var5,ignore.case=TRUE), 1, 
-                            0),
-           test_var6=ifelse(grepl(pattern,var6,ignore.case=TRUE), 1, 
-                            0),
-           test_var7=ifelse(grepl(pattern,var7,ignore.case=TRUE), 1, 
-                            0)
-          ) %>% 
-    summarise(is_var_1=sum(test_var1),
-              is_var_2=sum(test_var2),
-              is_var_3=sum(test_var3),
-              is_var_4=sum(test_var4),
-              is_var_5=sum(test_var5),
-              is_var_6=sum(test_var6),
-              is_var_7=sum(test_var7),
-              )
-  
-  }
-is_name_in_pattern<-detect_names [grepl("TES",detect_names$var1,ignore.case=TRUE),]
+last_column<-length(indata)
+#The last column is always the total for the whole national administration; 
+    #The first column is always useless, and the second has the row name 
+row_name<-indata %>% 
+  select(c(2))
+names(row_name)<-c("concepto")
+total_APN<-indata %>% 
+  select(c(all_of(last_column))
+         )
+names(total_APN)<-c("total")
 
-if(nrow(is_name_in_pattern)==1){
-  detect_names<-detect_names %>%
-    rename(tesoro_nacional=1)
-}else{ detect_names<-detect_names
-} #### This conditionally renames columns depending on whether they detect a correct pattern. 
-    #This can be the basis of a dedicated function. 
-
-
-is_name_in_pattern<-is_name_in_pattern[grepl("TES",is_name_in_pattern$1,ignore.case=TRUE),]
-
-  mutate(test_var1=ifelse(grepl("TES",var1,ignore.case=TRUE), 1, 
-                          0),
-         test_var2=ifelse(grepl("TES",var2,ignore.case=TRUE), 1, 
-                          0),
-         test_var3=ifelse(grepl("TES",var3,ignore.case=TRUE), 1, 
-                          0),
-         test_var4=ifelse(grepl("TES",var4,ignore.case=TRUE), 1, 
-                          0),
-         test_var5=ifelse(grepl("TES",var5,ignore.case=TRUE), 1, 
-                          0),
-         test_var6=ifelse(grepl("TES",var6,ignore.case=TRUE), 1, 
-                          0),
-         test_var7=ifelse(grepl("TES",var7,ignore.case=TRUE), 1, 
-                          0)
-  ) %>% 
-  summarise(is_var_1=sum(test_var1),
-            is_var_2=sum(test_var2),
-            is_var_3=sum(test_var3),
-            is_var_4=sum(test_var4),
-            is_var_5=sum(test_var5),
-            is_var_6=sum(test_var6),
-            is_var_7=sum(test_var7),
-  )
-
-
-  
-  check_data<-indata[,column_number]
-  check_data<-check_data %>% 
-    rename(temp_name=1) %>% 
-    grepl(pattern,temp_name,ignore.case = TRUE)
+indata<-indata %>% 
+  select(-c(1,2,all_of(last_column)))
     
-  print(column_number,patter,check_data)
+list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","TOTAL","OTROS|EMPRESAS")
+detect_names<-indata[(!grepl("[0-9]", indata$...3)) & !is.na(indata$...3), ] #Only keep rows with characters
+correct_names<-c("tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros")
+#head(detect_names)
+#detect_names<-detect_names %>% 
+ # select(c("...5",everything())) #We check this function works with out-of-order datasets
+
+for(i in 1:7) {
+  for (j in 1:7){
+  #This keeps only rows where the ith pattern is present in the jth column; there, we rename the  
+      #jth column following the ith correct name
+  #First we keep rows where the ith pattern is present in the jth column  
+  is_name_in_pattern<-detect_names [grepl(list_patterns[i],detect_names[[j]],ignore.case=TRUE),]
+  #Second, we keep only the column where the ith pattern is present
+  is_name_in_pattern<-is_name_in_pattern[,grepl(list_patterns[i],detect_names,ignore.case=TRUE)]
+  is_name_in_pattern<-as.data.frame(is_name_in_pattern)
+  print(is_name_in_pattern)
+  
+  #When the ith pattern is present in the jth column, we get a 1x1 df 
+  newcol<-correct_names[i]
+  oldcol<-colnames(detect_names)[j]
+  print(newcol)
+  print(oldcol)
+  
+  if(nrow(is_name_in_pattern)==1 & ncol(is_name_in_pattern)==1){ #So if we have a 1x1 df
+    detect_names<-detect_names %>%
+      rename(!!newcol := !!oldcol) #We rename the jth column with the ith correct column name
+  }else{ detect_names<-detect_names
+  } 
+              }
+           }
+names(indata)<-names(detect_names)
+outdata<-as.data.frame(c(row_name,indata,total_APN))
 }
 
-check_data<-detect_names[,1]
+test2<-get_col_names(test)
+test4<-get_col_names(test3)
+test5<-rbind(test2,test4) #This shows we can now rbind the two datasets, even with wrong 
+    #column numbers, and still get the variables right
 
-check_data<-check_data %>% 
-  rename(temp_name=1)
-check_data<-check_data %>% 
-  mutate(test=ifelse(grepl("TES",temp_name,ignore.case = TRUE), 1, 
-                     0)
-         ) %>% 
-  summarise(is_pattern_name=sum(test))
-
-
-
-check_pattern(detect_names,1,"TES")
-
-for (i in list_patterns) #Launch this to get a distinct excel file, for each CPI item, by region
-{
-  check_pattern(check_col,i)
-}
-
-
-
-detect_names<-detect_names %>% 
-  mutate(across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         across(everything(),~gsub("TESORO","TESORO NACIONAL",.x)),
-         
-         )
-
-mutate(across(starts_with("alicuota"),~gsub("Exento","0",.x)), #Ponemos en 0 las alícuotas exentas
-
-       detect_names<-test %>% 
-  subset((!grepl("[0-9]","...3")))
-
-test<-test %>% 
-  rename(es_concepto=2)
-test2<-test %>% 
-  mutate(test=ifelse(grepl("CONC",es_concepto,fixed=TRUE),1, 
-                     0)
-         )
-table(test2$test)
-
-  grepl("CONCEPTO",fixed=TRUE)
-head(test)
-
-names(test)<-c("var1:var11")
-
-test<-lapply(df_list_s2_xls,)
+head(test3)
 df_AIF <- bind_rows(c(df_list_xls), .id = "file")
 df_AIF_s2<-bind_rows (c(df_list_s2_xls), .id="file")
 df_AIF_s3<-bind_rows (c(df_list_s3_xls), .id="file")
@@ -343,7 +272,7 @@ df_AIF<-df_AIF %>%
   select(c(file,month,year,everything())) %>% 
   select(-c(4))
 
-list_AIF<-c("concepto","tesoro_nac","recursos_afect","org_desc","ISS","Ex-cajas_prov","total_AN","PAMI_otros","total")
+list_AIF<-c("concepto","tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros","total")
 names(df_AIF)<-c("archivo","mes","ano4",list_AIF)
 control<-df_AIF %>% 
   subset(!grepl("[0-9]",total)) %>% 
