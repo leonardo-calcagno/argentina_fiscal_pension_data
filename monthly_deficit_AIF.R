@@ -16,7 +16,7 @@ library(rlist)
 start.time=Sys.time()
 
 ##Folder creation
-setwd("C:/Users/lcalcagno/Documents/Investigación/argentina_fiscal_pension_data")
+setwd("C:/Users/lcalcagno/Documents/InvestigaciÃ³n/argentina_fiscal_pension_data")
 
 if(!file.exists("AIF")) {
   dir.create("AIF")
@@ -98,7 +98,7 @@ download.file(
   url = "https://www.economia.gob.ar/onp/documentos/resultado/caja/c2001/archivos/set01.xls", 
   destfile = "2001_09.xls", mode='wb'
 )
-rm(month,year,year_90,numeric_month,names_xls,names_xls_90,urls_xls,urls_xls_90)
+rm(month,year,year_90,numeric_month,names_xls,names_xls_90,urls_xls,urls_xls_90,urls_xlsx,names_xlsx)
 
 #Import all downloaded excel files --------
 #Code taken from https://stackoverflow.com/questions/32888757/how-can-i-read-multiple-excel-files-into-r
@@ -162,10 +162,17 @@ time.taken=end.time-start.time
 head(time.taken) #10 minutes to load the dataframes in a 8GB RAM laptop
 
 ###Detect AIF columns, even when in disorder------
-test<-df_list_s2_xls$`2021_junio.xlsx` 
-test3<-df_list_xls$`1997_05.xls`
-nrow(test)
+
+n.cols_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [2])) #[1] for rows, [2] for columns
+n.rows_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [1])) #[1] for rows, [2] for columns
+view(n.rows_xls)
+#The fourth quarter of 2015 datasets have too many rows, we take it into account in the get_col_names() function
+
+track_index<-0
+##We detect AIF columns with the get_col_names() function
 get_col_names<-function(indata){
+track_index<<-track_index+1
+print(track_index)
 #Fourth quarter of 2015 dataframe have too many rows, which causes bugs: we take only the first 
       #160 rows 
 if(nrow(indata)>160){
@@ -203,15 +210,15 @@ for(i in 1:7) {
   #Second, we keep only the column where the ith pattern is present
   is_name_in_pattern<-is_name_in_pattern[,grepl(list_patterns[i],detect_names,ignore.case=TRUE)]
   is_name_in_pattern<-as.data.frame(is_name_in_pattern)
-  print(is_name_in_pattern)
+#  print(is_name_in_pattern)
   
   #When the ith pattern is present in the jth column, we get a 1x1 df 
   newcol<-correct_names[i]
   oldcol<-colnames(detect_names)[j]
-  print(newcol)
-  print(oldcol)
+ # print(newcol)
+  #print(oldcol)
   
-  if(nrow(is_name_in_pattern)==1 & ncol(is_name_in_pattern)==1){ #So if we have a 1x1 df
+  if((nrow(is_name_in_pattern)>=1 & nrow(is_name_in_pattern)<=2 ) & ncol(is_name_in_pattern)==1){ #So if we have a 1x1 or 1x2 df
     detect_names<-detect_names %>%
       rename(!!newcol := !!oldcol) #We rename the jth column with the ith correct column name
   }else{ detect_names<-detect_names
@@ -224,30 +231,11 @@ outdata<-as.data.frame(c(row_name,indata,total_APN))
 #We now apply this function to all the data frames
 options(error = NULL)
 
-view(df_list_xls)
-view(test2)
-
-
-indata<-indata[1:160,]
-test5<-test[1:160,]
-test6<-test[1:160,]
-test<-df_list_xls$`1999_03.xls`
-test2<-df_list_xls$`2015_11.xls`
-test3<-df_list_xls$`2008_03.xls`
-
-test6<-get_col_names(test2)
-test4<-get_col_names(test5)
-
-n.cols_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [2])) #[1] for rows, [2] for columns
-n.rows_xls<-unlist(lapply(df_list_xls, function(t) dim(t) [1])) #[1] for rows, [2] for columns
-view(n.rows_xls)
-
-test<-sapply(df_list_xls,get_col_names,simplify=FALSE)
-test2<-sapply(df_list_s2_xls,get_col_names,simplify=FALSE)
-test3<-sapply(df_list_s3_xls,get_col_names,simplify=FALSE)
-
-
+track_index<-0
+df_list_xls<-sapply(df_list_xls,get_col_names,simplify=FALSE)
+track_index<-0
 df_list_s2_xls<-sapply(df_list_s2_xls,get_col_names,simplify=FALSE)
+track_index<-0
 df_list_s3_xls<-sapply(df_list_s3_xls,get_col_names,simplify=FALSE)
 
 #It is now safe to use bind_rows on all lists of data frames
@@ -255,28 +243,19 @@ df_AIF <- bind_rows(c(df_list_xls), .id = "file")
 df_AIF_s2<-bind_rows (c(df_list_s2_xls), .id="file")
 df_AIF_s3<-bind_rows (c(df_list_s3_xls), .id="file")
 
-df_AIF<-df_AIF[,1:11] #We keep only the first 11 columns: the file name and the 10 columns with relevant data.
-df_AIF_s2<-df_AIF_s2[,1:11] 
-df_AIF_s3<-df_AIF_s3[,1:11] 
-
 df_AIF<-rbind(df_AIF,df_AIF_s2,df_AIF_s3) #We concatenate all AIF table into one dataset
 ###We check all periods are in the df. It is true for the 1997-Sep. 2022 period. The only missing month
     #is September 2007. 
 table(df_AIF$file)
 
-#df_2001_09<-read_excel("2001_09.xls") %>% 
- # mutate(file="2001_09.xls")
-#df_AIF<-rbind(df_AIF,df_2001_09)
-
-
 rm(list=ls(pattern="*df_list"))
 rm(list=ls(pattern="*n.cols"))
-rm(list_xls,keep_s2_xls,keep_s3_xls,df_AIF_s2,df_AIF_s3,names_first_sheet)
+rm(list_xls,keep_s2_xls,keep_s3_xls,df_AIF_s2,df_AIF_s3,names_first_sheet,track_index)
 
 end.time=Sys.time()
 time.taken=end.time-start.time
 head(time.taken)
-
+save<-df_AIF
 #Format AIF dataset ------
 
 df_AIF<-df_AIF %>% 
@@ -298,11 +277,8 @@ df_AIF<-df_AIF %>%
          month=gsub("noviembre","11",month),  
          month=gsub("diciembre","12",month) 
   ) %>%
-  select(c(file,month,year,everything())) %>% 
-  select(-c(4))
+  select(c(file,month,year,everything())) 
 
-list_AIF<-c("concepto","tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros","total")
-names(df_AIF)<-c("archivo","mes","ano4",list_AIF)
 control<-df_AIF %>% 
   subset(!grepl("[0-9]",total)) %>% 
   subset(grepl("[0-9]",total_AN)) #We show there is no relevant information when the "total" variable is blank
@@ -369,6 +345,6 @@ head(time.taken)
 #On 4 GB Ram laptop, 7.6 minutes. 
 #Cleanup -----
 rm(output_name,sheet_name)
-setwd("C:/Users/lcalcagno/Documents/Investigación/MISSAR_private/R_files_for_MISSAR/")
+setwd("C:/Users/lcalcagno/Documents/InvestigaciÃ³n/MISSAR_private/R_files_for_MISSAR/")
 unlink("download_folder",recursive=TRUE)
 rm(list=ls())
