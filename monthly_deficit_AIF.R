@@ -255,7 +255,7 @@ rm(list_xls,keep_s2_xls,keep_s3_xls,df_AIF_s2,df_AIF_s3,names_first_sheet,track_
 end.time=Sys.time()
 time.taken=end.time-start.time
 head(time.taken)
-save<-df_AIF
+df_AIF<-save
 #Format AIF dataset ------
 
 df_AIF<-df_AIF %>% 
@@ -284,6 +284,56 @@ control<-df_AIF %>%
   subset(grepl("[0-9]",total_AN)) #We show there is no relevant information when the "total" variable is blank
 head(control)
 rm(control)
+#We check next that each column is correctly named 
+list_AIF<-c("concepto","tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros","total")
+list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","TOTAL","OTROS|EMPRESAS")
+list_control<-list_AIF[list_AIF!="concepto" & list_AIF!="total"]
+list_control_subset<-append(list_control,"file")
+
+control<-df_AIF %>% 
+  select(c(all_of(list_control_subset))) %>% 
+  mutate(across(all_of(list_control),~gsub("\\d+",NA,.x)) #We delete all numbers
+        ) 
+
+control<-control[rowSums(is.na(control)) != ncol(control)-1,] #We delete all rows where only the file name remains
+
+test<-control %>% 
+  mutate(delete=ifelse(grepl("AFECT",tesoro_nac), 1, 0)) 
+
+test2<-test %>% 
+  subset(delete==1)
+head(test2)
+
+control_3<-control %>% 
+  mutate(tesoro_nac="Otros")
+,
+         has_error=ifelse(grepl("OTROS|EMPRESAS",tesoro_nac,ignore.case=TRUE),1,0)
+         )
+
+df_loop<-as.data.frame(cbind(list_control,list_patterns))
+control_2<-control
+#Check how to make better the debug
+for (i in list_control){
+for (j in list_patterns){
+  
+  temp_list_patterns<-list_patterns[list_patterns!=j]
+  for (k in temp_list_patterns){
+  temp<-control %>% 
+    mutate(has_error=ifelse(grepl(k,i,ignore.case=TRUE),1,0)) %>% 
+    subset(has_error==1)
+  
+ if(nrow(temp)>=1){ 
+  print(temp)}
+  else{
+    
+  }
+  }   
+}  
+}
+
+control<-df_AIF %>% 
+  mutate(across(all_of(list_AIF), 
+                ))
 
 list_AIF<-list_AIF[list_AIF!="concepto"]
 save<-df_AIF
@@ -345,6 +395,6 @@ head(time.taken)
 #On 4 GB Ram laptop, 7.6 minutes. 
 #Cleanup -----
 rm(output_name,sheet_name)
-setwd("C:/Users/lcalcagno/Documents/Investigación/MISSAR_private/R_files_for_MISSAR/")
+setwd("C:/Users/lcalcagno/Documents/ión/MISSAR_private/R_files_for_MISSAR/")
 unlink("download_folder",recursive=TRUE)
 rm(list=ls())
