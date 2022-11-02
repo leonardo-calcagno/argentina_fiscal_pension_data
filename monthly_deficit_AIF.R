@@ -14,7 +14,8 @@ library(RCurl)
 start.time=Sys.time()
 
 ## Set wd to the folder with AIF files
-setwd("AIF/")
+setwd("../")
+setwd("debug_AIF/")
 getwd()
 #Import all downloaded excel files --------
 #Code taken from https://stackoverflow.com/questions/32888757/how-can-i-read-multiple-excel-files-into-r
@@ -25,6 +26,7 @@ getwd()
 start.time=Sys.time()
 list_xls <- list.files(pattern='*.xls')
 list_xls<-list_xls[!list_xls %in% "2000_01.xls"]
+
 view(list_xls)
 
 read_third_sheet <- function(path) { #Sometimes, the correct table is in the third sheet
@@ -72,11 +74,9 @@ df_list_s2_xls<-within(df_list_s2_xls, rm("2018_05.xls"))
 
 df_list_s3_xls<- df_list_s3_xls[- which(names(df_list_s3_xls) %in% names_first_sheet) ]
 
-
-
 end.time=Sys.time()
 time.taken=end.time-start.time
-head(time.taken) #10 minutes to load the dataframes in a 8GB RAM laptop
+head(time.taken) #10 minutes to load all dataframes in a 8GB RAM laptop
 
 ###Detect AIF columns, even when in disorder------
 
@@ -101,8 +101,14 @@ indata<-indata[1:160,]
 #The last column is always the total for the whole national administration; 
     #The first column is always useless, and the second has the row name 
 row_name<-indata %>% 
-  select(c(2))
-names(row_name)<-c("concepto")
+  select(c(1,2))
+names(row_name)<-c("sec_hacienda","concepto") 
+row_name<-row_name %>% 
+  mutate(concepto=ifelse(is.na(concepto), sec_hacienda, 
+                         concepto)#Sometimes the row name ends up in the first, instead of second, column
+         ) %>% 
+  select(c(concepto))
+
 total_APN<-indata %>% 
   select(c(all_of(last_column))
          )
