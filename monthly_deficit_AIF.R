@@ -100,12 +100,19 @@ download.file(
 )
 rm(month,year,year_90,numeric_month,names_xls,names_xls_90,urls_xls,urls_xls_90,urls_xlsx,names_xlsx)
 
+
+end.time=Sys.time()
+time.taken=end.time-start.time
+head(time.taken)
+
+
 #Import all downloaded excel files --------
 #Code taken from https://stackoverflow.com/questions/32888757/how-can-i-read-multiple-excel-files-into-r
 #########WARNING:Jan. 2000##############
 ###The only month that does not work is January 2000, it is a weird xml file. You need to open it with 
 #excel, and save it as an excel file in the AIF folder with a different name (2000_enero for instance). 
 
+start.time=Sys.time()
 list_xls <- list.files(pattern='*.xls')
 list_xls<-list_xls[!list_xls %in% "2000_01.xls"]
 view(list_xls)
@@ -252,10 +259,6 @@ rm(list=ls(pattern="*df_list"))
 rm(list=ls(pattern="*n.cols"))
 rm(list_xls,keep_s2_xls,keep_s3_xls,df_AIF_s2,df_AIF_s3,names_first_sheet,track_index)
 
-end.time=Sys.time()
-time.taken=end.time-start.time
-head(time.taken)
-save<-df_AIF
 #Format AIF dataset ------
 
 df_AIF<-df_AIF %>% 
@@ -303,7 +306,7 @@ control<-control %>%
   mutate(has_error=0)
 
 for (i in 1:7){
-  incorrect_patterns<-list_patterns[list_patterns!=df_loop[i,2]]
+  incorrect_patterns<-list_patterns[list_patterns!=df_loop[i,2]] #We check for all the wrong patterns for the column
   print(df_loop[i,2])
   incorrect_patterns<-paste(incorrect_patterns,collapse="|")
   print(incorrect_patterns)
@@ -318,20 +321,23 @@ errors<-control %>%
   subset(has_error==1)
 head(errors) #Shows files with errors in column names. 
 rm(control,errors,incorrect_patterns,list_patterns,df_loop)
+
+
+###Get numeric data -----
 df_AIF<-df_AIF %>% 
   subset(grepl("[0-9]",total)) %>%  #We delete lines with no information (no numeric data on the total variable)
-  mutate(across(all_of(list_AIF),~as.double(.x) #The remaining lines are converted to numeric
+  mutate(across(all_of(list_AIF[list_AIF!="concepto"]),~as.double(.x) #The remaining lines are converted to numeric
   )) %>% 
-  group_by(archivo) %>% 
-  mutate(numero_linea=row_number()) %>% 
+  group_by(file) %>% 
+  mutate(table_line=row_number()) %>% 
   ungroup() %>%   #Row number keeps the integrity of each table even when arranged
-  select(c("archivo","ano4","mes","numero_linea",everything()))
+  select(c("file","year","month","table_line",everything()))
 
 table_file_size<-df_AIF %>% 
-  group_by(archivo) %>% 
+  group_by(file) %>% 
   tally() %>% 
-  ungroup() %>%  #The most recent monthly AIF lacks financial sources and applications, beware. 
-  rename(total_lineas=n)
+  ungroup() %>%  #The most recent monthly AIF often lacks financial sources and applications, beware. 
+  rename(table_line=n)
 
 
 
@@ -341,8 +347,13 @@ table_file_size<-df_AIF %>%
 
 #Concept names may change; run this to check how the concept you are interested in may be named. 
 #Combine with row number for some concepts that may be repeated (such as "transferencias corrientes)
-concept_names<- as.data.frame(df_AIF$concepto)
+concept_names<- as.data.frame(df_AIF$concepto) %>% 
+  distinct()
 view(concept_names)
+
+missing_concept<-df_AIF %>% 
+  subset(is.na(concepto)) #Some months have the concept column in the wrong place for some characters, must be corrected. 
+
 #Here, we are only interested in ANSES fiscal income, used for pension mobiliy computation. 
 
 df_ISS_fiscal_income<-df_AIF %>% 
