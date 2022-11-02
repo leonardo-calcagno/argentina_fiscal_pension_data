@@ -16,7 +16,7 @@ library(rlist)
 start.time=Sys.time()
 
 ##Folder creation
-setwd("C:/Users/lcalcagno/Documents/InvestigaciÃ³n/argentina_fiscal_pension_data")
+setwd("C:/Users/lcalcagno/Documents/Investigación/argentina_fiscal_pension_data")
 
 if(!file.exists("AIF")) {
   dir.create("AIF")
@@ -230,9 +230,9 @@ outdata<-as.data.frame(c(row_name,indata,total_APN))
 }
 #We now apply this function to all the data frames
 options(error = NULL)
-
 track_index<-0
 df_list_xls<-sapply(df_list_xls,get_col_names,simplify=FALSE)
+#debug<-df_list_xls[85], for instance, gives the 85th element of df_list_xls
 track_index<-0
 df_list_s2_xls<-sapply(df_list_s2_xls,get_col_names,simplify=FALSE)
 track_index<-0
@@ -255,7 +255,7 @@ rm(list_xls,keep_s2_xls,keep_s3_xls,df_AIF_s2,df_AIF_s3,names_first_sheet,track_
 end.time=Sys.time()
 time.taken=end.time-start.time
 head(time.taken)
-df_AIF<-save
+save<-df_AIF
 #Format AIF dataset ------
 
 df_AIF<-df_AIF %>% 
@@ -284,7 +284,8 @@ control<-df_AIF %>%
   subset(grepl("[0-9]",total_AN)) #We show there is no relevant information when the "total" variable is blank
 head(control)
 rm(control)
-#We check next that each column is correctly named 
+
+####Control: colummns have correct names-----
 list_AIF<-c("concepto","tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros","total")
 list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","TOTAL","OTROS|EMPRESAS")
 list_control<-list_AIF[list_AIF!="concepto" & list_AIF!="total"]
@@ -294,51 +295,29 @@ control<-df_AIF %>%
   select(c(all_of(list_control_subset))) %>% 
   mutate(across(all_of(list_control),~gsub("\\d+",NA,.x)) #We delete all numbers
         ) 
-
 control<-control[rowSums(is.na(control)) != ncol(control)-1,] #We delete all rows where only the file name remains
 
-test<-control %>% 
-  mutate(delete=ifelse(grepl("AFECT",tesoro_nac), 1, 0)) 
-
-test2<-test %>% 
-  subset(delete==1)
-head(test2)
-
-control_3<-control %>% 
-  mutate(tesoro_nac="Otros")
-,
-         has_error=ifelse(grepl("OTROS|EMPRESAS",tesoro_nac,ignore.case=TRUE),1,0)
-         )
 
 df_loop<-as.data.frame(cbind(list_control,list_patterns))
-control_2<-control
-#Check how to make better the debug
-for (i in list_control){
-for (j in list_patterns){
-  
-  temp_list_patterns<-list_patterns[list_patterns!=j]
-  for (k in temp_list_patterns){
-  temp<-control %>% 
-    mutate(has_error=ifelse(grepl(k,i,ignore.case=TRUE),1,0)) %>% 
-    subset(has_error==1)
-  
- if(nrow(temp)>=1){ 
-  print(temp)}
-  else{
-    
-  }
-  }   
-}  
+control<-control %>% 
+  mutate(has_error=0)
+
+for (i in 1:7){
+  incorrect_patterns<-list_patterns[list_patterns!=df_loop[i,2]]
+  print(df_loop[i,2])
+  incorrect_patterns<-paste(incorrect_patterns,collapse="|")
+  print(incorrect_patterns)
+  control<-control %>% 
+    mutate(has_error=ifelse(grepl(incorrect_patterns,df_loop[i,1],ignore.case=TRUE),1, 
+                         has_error)
+          )
+  print(df_loop[i,1])
 }
 
-control<-df_AIF %>% 
-  mutate(across(all_of(list_AIF), 
-                ))
-
-list_AIF<-list_AIF[list_AIF!="concepto"]
-save<-df_AIF
-head(save)
-
+errors<-control %>% 
+  subset(has_error==1)
+head(errors) #Shows files with errors in column names. 
+rm(control,errors,incorrect_patterns,list_patterns,df_loop)
 df_AIF<-df_AIF %>% 
   subset(grepl("[0-9]",total)) %>%  #We delete lines with no information (no numeric data on the total variable)
   mutate(across(all_of(list_AIF),~as.double(.x) #The remaining lines are converted to numeric
