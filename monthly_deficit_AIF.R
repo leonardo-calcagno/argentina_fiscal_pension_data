@@ -14,8 +14,7 @@ library(RCurl)
 start.time=Sys.time()
 
 ## Set wd to the folder with AIF files
-setwd("../")
-setwd("debug_AIF/")
+setwd("AIF/")
 getwd()
 #Import all downloaded excel files --------
 #Code taken from https://stackoverflow.com/questions/32888757/how-can-i-read-multiple-excel-files-into-r
@@ -263,13 +262,18 @@ table_file_size<-df_AIF %>%
 
 #Concept names may change; run this to check how the concept you are interested in may be named. 
 #Combine with row number for some concepts that may be repeated (such as "transferencias corrientes)
+
+missing_concept<-df_AIF %>% 
+  subset(is.na(concepto)) #Verify if the concepto column is missing
+head(missing_concept)
+df_AIF<-df_AIF %>% 
+  subset(!is.na(concepto))
+
 concept_names<- as.data.frame(df_AIF$concepto) %>% 
   distinct()
 view(concept_names)
 
-missing_concept<-df_AIF %>% 
-  subset(is.na(concepto)) #Some months have the concept column in the wrong place for some characters, must be corrected. 
-
+#Results----
 #Here, we are only interested in ANSES fiscal income, used for pension mobiliy computation. 
 
 df_ISS_fiscal_income<-df_AIF %>% 
@@ -277,27 +281,65 @@ df_ISS_fiscal_income<-df_AIF %>%
                                  0)
   )%>% 
   subset(is_fiscal_income==1 ) %>% 
-  mutate(mes_num=as.numeric(mes)) %>% 
-  arrange(ano4,mes) %>% 
-  select(c(ano4,mes,concepto,ISS))
+  mutate(month_num=as.numeric(month)) %>% 
+  arrange(year,month) %>% 
+  select(c(year,month,concepto,ISS))
 #Here we check is_fiscal_income captures all rows that correspond to fiscal income, and only 
 #those rows.
-total_files<-nrow(as.data.frame(table(df_AIF$archivo)))
+total_files<-nrow(as.data.frame(table(df_AIF$file)))
 head(total_files)
 table(df_ISS_fiscal_income$concepto) 
 
-#We update ANSES fiscal income information in the global file
-vector_ISS_fiscal_income<-df_ISS_fiscal_income %>% 
-  subset(ano4>=2018) %>%  #We added manual corrections in 2017 to account for 2017 fiscal amnesty tax income
-  select(c(ISS))
+#We also want to see the surplus and operative deficit of public firms. 
 
-range_write(vector_ISS_fiscal_income,ss=id_globals,range="I284",col_names =FALSE,sheet="Pessimistic projection",reformat=FALSE) #
 
+df_public_firms_deficit<-df_AIF %>% 
+  mutate(is_public_firm_deficit=ifelse(grepl("*DEFICIT OPER",concepto) | grepl("DÉFICIT OPER",concepto), 1, 
+                                       0)
+  )%>% 
+  subset(is_public_firm_deficit==1 ) %>% 
+  mutate(month_num=as.numeric(month)) %>% 
+  arrange(year,month) %>% 
+  select(c(year,month,PAMI_otros))%>% 
+  rename(deficit=PAMI_otros)
+
+df_public_firms_surplus<-df_AIF %>% 
+  mutate(is_public_firm_surplus=ifelse(grepl("*SUPERAVIT OPER",concepto) | grepl("SUPERÁVIT OPER",concepto), 1, 
+                                0)
+        ) %>%  
+  subset(is_public_firm_surplus==1  ) %>% 
+  mutate(month_num=as.numeric(month)) %>% 
+  arrange(year,month) %>% 
+  select(c(year,month,PAMI_otros)) %>% 
+  rename(surplus=PAMI_otros)
+
+df_public_firms_result<-df_public_firms_surplus %>% 
+  left_join(df_public_firms_deficit) %>% 
+  mutate(public_firms_result=surplus-deficit)
+view(df_public_firms_result)
+
+###Export results----
+setwd("../")
+
+if(!file.exists("results_folder")) {
+  dir.create("results_folder")
+}
+
+setwd("results_folder/")
+getwd()
+
+
+write.xlsx(df_AIF,"all_AIF_97_22.xlsx")
+
+write.xlsx(df_public_firms_result,"public_firms_result_97_22.xlsx")
+
+write.xlsx(df_ISS_fiscal_income,"ISS_fiscal_income_97_22.xlsx")
+
+
+rm(df_public_firms_deficit,df_public_firms_surplus)
 rm(total_files,control,list_AIF,table_file_size,concept_names,vector_ISS_fiscal_income,df_ISS_fiscal_income)
 
-end.time=Sys.time()
-time.taken=end.time-start.time
-head(time.taken)
+
 #On 4 GB Ram laptop, 7.6 minutes. 
 #Cleanup -----
 rm(output_name,sheet_name)
