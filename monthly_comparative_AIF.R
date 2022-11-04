@@ -1,6 +1,6 @@
-# This code uploads all Argentina's National Public Sector Savings-Investment-Funding Account, 
-    #downloaded from download_all_AIF; concatenates the bases in a single file; 
-    #and outputs a time series of the desired income or expense element, by type of institution
+# This code uploads the monthly level of total public sector expenditure and income by type, 
+    #usually the second sheet of Argentina's national Public Sector Savings-Investment-Funding Acount; concatenates
+    #the bases in a single file; and outputs a time series of all the monthly comparison income and expenditure.
 rm(list=ls())
 gc()
 # Open packages
@@ -14,31 +14,24 @@ library(RCurl)
 start.time=Sys.time()
 
 ## Set wd to the folder with AIF files
+
 setwd("C:/Users/lcalcagno/Documents/Investigación/argentina_fiscal_pension_data")
 setwd("AIF/")
 getwd()
-#Import all downloaded excel files --------
+#Import the relevant excel files --------
 #Code taken from https://stackoverflow.com/questions/32888757/how-can-i-read-multiple-excel-files-into-r
-#########WARNING:Jan. 2000##############
-###The only month that does not work is January 2000, it is a weird xml file. You need to open it with 
-#excel, and save it as an excel file in the AIF folder with a different name (2000_enero for instance). 
-
+#The comparative sheet is only available starting from January 2017, and gives information starting from Jan. 2016
 start.time=Sys.time()
-list_xls <- list.files(pattern='*.xls')
-list_xls<-list_xls[!list_xls %in% "2000_01.xls"]
-
-####If you want to run this for only some years, run the following function:
-load_some_years<-function(indata,min_year,max_year){
+list_xls<-list.files(pattern='*.xls')
 df_list_xls <- as.data.frame(list.files(pattern='*.xls')) %>%
   rename(file_name=1) %>% 
   mutate(year=as.integer(substr(start=1,stop=4,file_name))) %>% 
-  subset(year>=min_year & year<=max_year) %>%  #The comparative sheet is only available starting from January 2017
+  subset(year>=2017) %>%  
   select(c(file_name)) %>% 
   t()
 
 list_xls<-as.character(df_list_xls)
-}
-#list_xls<-load_some_years(2017,2100) Example run: all periods from 2017 onward.
+
 
 view(list_xls)
 
@@ -101,68 +94,68 @@ view(n.rows_xls)
 track_index<-0
 ##We detect AIF columns with the get_col_names() function
 get_col_names<-function(indata){
-track_index<<-track_index+1
-print(track_index)
-#Fourth quarter of 2015 dataframe have too many rows, which causes bugs: we take only the first 
-      #160 rows 
-if(nrow(indata)>160){
-indata<-indata[1:160,]  
-}else{
-  indata<-indata
-}
+  track_index<<-track_index+1
+  print(track_index)
+  #Fourth quarter of 2015 dataframe have too many rows, which causes bugs: we take only the first 
+  #160 rows 
+  if(nrow(indata)>160){
+    indata<-indata[1:160,]  
+  }else{
+    indata<-indata
+  }
   last_column<-length(indata)
-#The last column is always the total for the whole national administration; 
-    #The first column is always useless, and the second has the row name 
-row_name<-indata %>% 
-  select(c(1,2))
-names(row_name)<-c("sec_hacienda","concepto") 
-row_name<-row_name %>% 
-  mutate(concepto=ifelse(is.na(concepto), sec_hacienda, 
-                         concepto)#Sometimes the row name ends up in the first, instead of second, column
-         ) %>% 
-  select(c(concepto))
-
-total_APN<-indata %>% 
-  select(c(all_of(last_column))
-         )
-names(total_APN)<-c("total")
-
-indata<-indata %>% 
-  select(-c(1,2,all_of(last_column)))
-    
-list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","TOTAL","OTROS|EMPRESAS")
-detect_names<-indata[(!grepl("[0-9]", indata$...3)) & !is.na(indata$...3), ] #Only keep rows with characters
-correct_names<-c("tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros")
-#head(detect_names)
-#detect_names<-detect_names %>% 
- # select(c("...5",everything())) #We check this function works with out-of-order datasets
-
-for(i in 1:7) {
-  for (j in 1:7){
-  #This keeps only rows where the ith pattern is present in the jth column; there, we rename the  
+  #The last column is always the total for the whole national administration; 
+  #The first column is always useless, and the second has the row name 
+  row_name<-indata %>% 
+    select(c(1,2))
+  names(row_name)<-c("sec_hacienda","concepto") 
+  row_name<-row_name %>% 
+    mutate(concepto=ifelse(is.na(concepto), sec_hacienda, 
+                           concepto)#Sometimes the row name ends up in the first, instead of second, column
+    ) %>% 
+    select(c(concepto))
+  
+  total_APN<-indata %>% 
+    select(c(all_of(last_column))
+    )
+  names(total_APN)<-c("total")
+  
+  indata<-indata %>% 
+    select(-c(1,2,all_of(last_column)))
+  
+  list_patterns<-c("TES","AFECT","DESC","INST","CAJAS","TOTAL","OTROS|EMPRESAS")
+  detect_names<-indata[(!grepl("[0-9]", indata$...3)) & !is.na(indata$...3), ] #Only keep rows with characters
+  correct_names<-c("tesoro_nac","recursos_afect","org_desc","ISS","Ex_cajas_prov","total_AN","PAMI_otros")
+  #head(detect_names)
+  #detect_names<-detect_names %>% 
+  # select(c("...5",everything())) #We check this function works with out-of-order datasets
+  
+  for(i in 1:7) {
+    for (j in 1:7){
+      #This keeps only rows where the ith pattern is present in the jth column; there, we rename the  
       #jth column following the ith correct name
-  #First we keep rows where the ith pattern is present in the jth column  
-  is_name_in_pattern<-detect_names [grepl(list_patterns[i],detect_names[[j]],ignore.case=TRUE),]
-  #Second, we keep only the column where the ith pattern is present
-  is_name_in_pattern<-is_name_in_pattern[,grepl(list_patterns[i],detect_names,ignore.case=TRUE)]
-  is_name_in_pattern<-as.data.frame(is_name_in_pattern)
-#  print(is_name_in_pattern)
-  
-  #When the ith pattern is present in the jth column, we get a 1x1 df 
-  newcol<-correct_names[i]
-  oldcol<-colnames(detect_names)[j]
- # print(newcol)
-  #print(oldcol)
-  
-  if((nrow(is_name_in_pattern)>=1 & nrow(is_name_in_pattern)<=2 ) & ncol(is_name_in_pattern)==1){ #So if we have a 1x1 or 1x2 df
-    detect_names<-detect_names %>%
-      rename(!!newcol := !!oldcol) #We rename the jth column with the ith correct column name
-  }else{ detect_names<-detect_names
-  } 
-              }
-           }
-names(indata)<-names(detect_names)
-outdata<-as.data.frame(c(row_name,indata,total_APN))
+      #First we keep rows where the ith pattern is present in the jth column  
+      is_name_in_pattern<-detect_names [grepl(list_patterns[i],detect_names[[j]],ignore.case=TRUE),]
+      #Second, we keep only the column where the ith pattern is present
+      is_name_in_pattern<-is_name_in_pattern[,grepl(list_patterns[i],detect_names,ignore.case=TRUE)]
+      is_name_in_pattern<-as.data.frame(is_name_in_pattern)
+      #  print(is_name_in_pattern)
+      
+      #When the ith pattern is present in the jth column, we get a 1x1 df 
+      newcol<-correct_names[i]
+      oldcol<-colnames(detect_names)[j]
+      # print(newcol)
+      #print(oldcol)
+      
+      if((nrow(is_name_in_pattern)>=1 & nrow(is_name_in_pattern)<=2 ) & ncol(is_name_in_pattern)==1){ #So if we have a 1x1 or 1x2 df
+        detect_names<-detect_names %>%
+          rename(!!newcol := !!oldcol) #We rename the jth column with the ith correct column name
+      }else{ detect_names<-detect_names
+      } 
+    }
+  }
+  names(indata)<-names(detect_names)
+  outdata<-as.data.frame(c(row_name,indata,total_APN))
 }
 #We now apply this function to all the data frames
 options(error = NULL)
@@ -181,7 +174,7 @@ df_AIF_s3<-bind_rows (c(df_list_s3_xls), .id="file")
 
 df_AIF<-rbind(df_AIF,df_AIF_s2,df_AIF_s3) #We concatenate all AIF table into one dataset
 ###We check all periods are in the df. It is true for the 1997-Sep. 2022 period. The only missing month
-    #is September 2007. 
+#is September 2007. 
 table(df_AIF$file)
 
 rm(list=ls(pattern="*df_list"))
@@ -226,7 +219,7 @@ list_control_subset<-append(list_control,"file")
 control<-df_AIF %>% 
   select(c(all_of(list_control_subset))) %>% 
   mutate(across(all_of(list_control),~gsub("\\d+",NA,.x)) #We delete all numbers
-        ) 
+  ) 
 control<-control[rowSums(is.na(control)) != ncol(control)-1,] #We delete all rows where only the file name remains
 
 
@@ -241,8 +234,8 @@ for (i in 1:7){
   print(incorrect_patterns)
   control<-control %>% 
     mutate(has_error=ifelse(grepl(incorrect_patterns,df_loop[i,1],ignore.case=TRUE),1, 
-                         has_error)
-          )
+                            has_error)
+    )
   print(df_loop[i,1])
 }
 
@@ -319,8 +312,8 @@ df_public_firms_deficit<-df_AIF %>%
 
 df_public_firms_surplus<-df_AIF %>% 
   mutate(is_public_firm_surplus=ifelse(grepl("*SUPERAVIT OPER",concepto) | grepl("SUPERÁVIT OPER",concepto), 1, 
-                                0)
-        ) %>%  
+                                       0)
+  ) %>%  
   subset(is_public_firm_surplus==1  ) %>% 
   mutate(month_num=as.numeric(month)) %>% 
   arrange(year,month) %>% 
