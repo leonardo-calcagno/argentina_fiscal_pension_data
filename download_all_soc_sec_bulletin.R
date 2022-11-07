@@ -147,7 +147,7 @@ walk2(urls_xls,names_xls,safely(download.file), mode = "wb")
 
 
 #March 2007 has a different URL, we input it manually
-download.file("https://contenidos.afip.gob.ar/institucional/estudios/archivos/boletin.Marzo2007.xls",destfile="2007_03.xls")
+download.file("https://contenidos.afip.gob.ar/institucional/estudios/archivos/boletin.Marzo2007.xls",destfile="2007_03.xls",mode='wb')
 ###The first quarter of 2007 data has a different format 
 
 list_xls <- list.files(pattern='*.xls')
