@@ -14,7 +14,7 @@ library(rlist)
 rm(list=ls())
 gc()
 start.time=Sys.time()
-setwd("C:/Users/lcalcagno/Documents/Investigación/MISSAR_private/R_files_for_MISSAR")
+setwd("C:/Users/lcalcagno/Documents/Investigación/argentina_fiscal_pension_data")
 
 if(!file.exists("bol_men_ss")) {
   dir.create("bol_men_ss")
@@ -161,7 +161,7 @@ file.copy(from=list_xls, to="../",
 setwd("../")
 getwd()
 unlink("alternate_url",recursive=TRUE)
-unlink("05_09b.xls",recursive=TRUE) #There was one wrong september file left ove
+unlink("05_09b.xls",recursive=TRUE) #There was one wrong september file left over
 
 end.time=Sys.time()
 time.taken=end.time-start.time
